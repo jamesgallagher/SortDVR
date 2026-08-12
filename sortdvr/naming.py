@@ -20,6 +20,24 @@ from sortdvr.models import Recording
 _ILLEGAL = re.compile(r'[\\/:*?"<>|]+')
 _YEAR = re.compile(r"\((?:19|20)\d{2}\)")
 _VERSUS = re.compile(r"\b(?:v|vs)\b", re.IGNORECASE)
+
+# Content-variant detection — mirrors SpoilerFree's detect_variant token sets
+# (sfps/identifier.py) so the two apps agree. We check title AND description
+# (SpoilerFree only sees the filename), and re-inject a recognised token because
+# our gold-standard rebuild drops the original title.
+_TOKEN_SPLIT = re.compile(r"[^A-Za-z0-9']+")
+_HIGHLIGHTS_TOKENS = {"hl", "hls", "highlights"}
+_MINI_TOKENS = {"mini"}
+
+
+def sport_variant(rec: Recording) -> str:
+    """'HLS' | 'Mini' | '' from the title + description."""
+    toks = {t.lower() for t in _TOKEN_SPLIT.split(f"{rec.title} {rec.description}") if t}
+    if toks & _HIGHLIGHTS_TOKENS:
+        return "HLS"
+    if toks & _MINI_TOKENS:
+        return "Mini"
+    return ""
 # Leading capital, up to a versus, then the opponent — stops at sentence end
 # (no '.' in the trailing class) so we don't swallow the rest of the description.
 _VERSUS_CLAUSE = re.compile(r"([A-Za-z][\w'&\- ]*\b(?:v|vs)\b[\w'&\- ]+)")
@@ -86,8 +104,18 @@ def _sport_name(rec: Recording, llm) -> str:
         name = f"{llm.competition.strip()} - {core}" if llm.competition.strip() else core
         if llm.sport.strip():
             name = f"{name} ({llm.sport.strip()})"
-        return safe(name)
-    return safe(_sport_matchup(rec))
+    else:
+        name = _sport_matchup(rec)
+
+    # Re-inject a highlights/mini tag SpoilerFree will detect, unless the name
+    # already carries one (e.g. the fallback kept it from the title).
+    var = sport_variant(rec)
+    if var:
+        name_toks = {t.lower() for t in _TOKEN_SPLIT.split(name) if t}
+        wanted = _HIGHLIGHTS_TOKENS if var == "HLS" else _MINI_TOKENS
+        if not name_toks & wanted:
+            name = f"{name} ({var})"
+    return safe(name)
 
 
 def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config,

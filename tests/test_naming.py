@@ -92,6 +92,37 @@ def test_sport_gold_standard_from_llm():
         p.rel_path), p.rel_path
 
 
+def _sport_rec(title: str, description: str = "") -> Recording:
+    return Recording.from_api({
+        "id": 1, "channel": 1, "start_time": "2026-08-11T16:13:00Z",
+        "custom_properties": {"program": {"title": title, "description": description}},
+    })
+
+
+def test_sport_highlights_tag_lifted_from_description():
+    rec = _sport_rec("Sharks v All Blacks", "Highlights of the tour match at Kings Park.")
+    llm = LLMResult("SPORT", 0.9, sport="Rugby", competition="Greatest Rivalry Tour",
+                    home_team="Sharks", away_team="All Blacks")
+    p = plan(rec, Decision(SPORT, 0.9, "versus"), "Sky Sport", CFG, llm=llm)
+    assert "(HLS)" in p.rel_path, p.rel_path
+
+
+def test_sport_mini_tag_from_title():
+    rec = _sport_rec("EPL Arsenal v Chelsea Mini")
+    llm = LLMResult("SPORT", 0.9, sport="Soccer", competition="English Premier League",
+                    home_team="Arsenal", away_team="Chelsea")
+    p = plan(rec, Decision(SPORT, 0.9, "versus"), "Sky Sports", CFG, llm=llm)
+    assert "(Mini)" in p.rel_path, p.rel_path
+
+
+def test_sport_no_double_highlights_tag():
+    # fallback keeps 'Highlights' from the title; don't also append (HLS)
+    rec = _sport_rec("Formula 1 Highlights Miami GP", "Highlights package")
+    p = plan(rec, Decision(SPORT, 0.9, "versus"), "Sky Sports", CFG, llm=None)
+    assert "(hls)" not in p.rel_path.lower()
+    assert "highlights" in p.rel_path.lower()
+
+
 def test_movie_prefers_tmdb_over_llm_and_epg():
     p = plan(_recs()[88], Decision("MOVIE", 0.8, "movie channel"), "Sky Cinema Premiere",
              CFG, llm=LLMResult("MOVIE", 0.9, clean_title="Normal"),
