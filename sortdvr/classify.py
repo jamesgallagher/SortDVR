@@ -72,9 +72,11 @@ def classify(rec: Recording, channel_name: str, cfg: Config) -> Decision:
     versus = bool(_VERSUS.search(title))
     sport_token = bool(_SPORT_TOKENS.search(text))
 
-    # 3. sport — versus needs a corroborating sport token; movie channels veto
+    # 3. sport — versus needs a corroborating sport token; movie channels veto.
+    #    All sport triggers the second pass: not to confirm the type, but to
+    #    extract {sport, competition, home, away} for the gold-standard handoff.
     if versus and sport_token and ctype != MOVIE:
-        return Decision(SPORT, 0.9, "versus + sport token")
+        return Decision(SPORT, 0.9, "versus + sport token", needs_second_pass=llm)
     if ctype == SPORT:
         return Decision(SPORT, 0.75, "dedicated sport channel", needs_second_pass=llm)
 
@@ -99,4 +101,8 @@ def refine(decision: Decision, llm) -> Decision:
         return decision
     if decision.type == REVIEW and llm.confidence >= 0.6:
         return Decision(llm.type, llm.confidence, "llm second pass")
+    # let a confident LLM correct a low-confidence deterministic guess, e.g. a
+    # footy panel show on a sports channel (SPORT 0.75) that is really TV.
+    if decision.confidence < 0.85 and llm.confidence >= 0.85 and llm.type != decision.type:
+        return Decision(llm.type, llm.confidence, f"llm override of {decision.reason}")
     return decision

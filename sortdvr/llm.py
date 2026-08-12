@@ -31,10 +31,22 @@ GEMINI_MODEL = "gemini-1.5-flash"
 SYSTEM = (
     "You classify a single recorded TV broadcast as exactly one of: movie, sport, tv. "
     "Sport means a real competition between real teams/competitors. Titles like "
-    "'Batman v Superman' or 'Kramer vs Kramer' are movies, not sport. If it is a movie "
-    "or tv show, return a clean title (and release year for movies). Respond ONLY as JSON."
+    "'Batman v Superman' or 'Kramer vs Kramer' are movies, not sport.\n"
+    "- movie/tv: return a clean title (and release year for movies if you are certain; "
+    "leave year null rather than guessing).\n"
+    "- sport: extract, from the title AND description, the fields a sports database "
+    "needs. Use FULL names as a sports database would list them. 'sport' is the sport "
+    "itself (Rugby, Cricket, Soccer, Motorsport...). For team events fill home_team and "
+    "away_team (in 'A v B', A is home); leave them empty for non-team events (races, "
+    "tours, tennis) and put the specific session in event_name. 'competition' is the "
+    "league/tournament/series.\n"
+    "Respond ONLY as JSON."
 )
-SCHEMA_HINT = '{"type":"movie|sport|tv","confidence":0.0,"clean_title":"","year":null,"reasoning":""}'
+SCHEMA_HINT = (
+    '{"type":"movie|sport|tv","confidence":0.0,"clean_title":"","year":null,'
+    '"sport":"","competition":"","home_team":"","away_team":"","event_name":"",'
+    '"reasoning":""}'
+)
 
 _TYPE_MAP = {"movie": "MOVIE", "sport": "SPORT", "tv": "TV"}
 
@@ -45,6 +57,11 @@ class LLMResult:
     confidence: float
     clean_title: str = ""
     year: str = ""
+    sport: str = ""
+    competition: str = ""
+    home_team: str = ""
+    away_team: str = ""
+    event_name: str = ""
     reasoning: str = ""
 
 
@@ -116,6 +133,11 @@ def second_pass(rec: Recording, channel_name: str, cfg: Config) -> LLMResult | N
             confidence=float(data.get("confidence") or 0),
             clean_title=str(data.get("clean_title") or ""),
             year=str(year) if year else "",
+            sport=str(data.get("sport") or ""),
+            competition=str(data.get("competition") or ""),
+            home_team=str(data.get("home_team") or ""),
+            away_team=str(data.get("away_team") or ""),
+            event_name=str(data.get("event_name") or ""),
             reasoning=str(data.get("reasoning") or ""),
         )
     except urllib.error.HTTPError as e:

@@ -62,8 +62,8 @@ def _movie_year(title: str) -> str:
 
 
 def _sport_matchup(rec: Recording) -> str:
-    """Prefer a versus clause; from the title, else lifted from the description
-    (the competition-titled case, e.g. 'The Hundred') with the title kept."""
+    """Fallback matchup when the LLM gave nothing: prefer a versus clause from
+    the title, else lift one from the description (the 'The Hundred' case)."""
     title = rec.title.strip()
     if _VERSUS.search(title):
         return title
@@ -74,8 +74,24 @@ def _sport_matchup(rec: Recording) -> str:
     return title  # competition-only; SpoilerFree still attempts identification
 
 
+def _sport_name(rec: Recording, llm) -> str:
+    """Gold-standard sport name for TheSportsDB matching (design research):
+    ``{Competition} - {Home} vs {Away} ({Sport})``. Teams + sport are what the
+    matcher keys on; competition is a helpful extra. Falls back to the raw
+    matchup when the LLM is absent or gave no usable participants.
+    """
+    if llm and llm.type == SPORT and ((llm.home_team and llm.away_team) or llm.event_name):
+        core = f"{llm.home_team} vs {llm.away_team}" if llm.home_team and llm.away_team \
+            else llm.event_name.strip()
+        name = f"{llm.competition.strip()} - {core}" if llm.competition.strip() else core
+        if llm.sport.strip():
+            name = f"{name} ({llm.sport.strip()})"
+        return safe(name)
+    return safe(_sport_matchup(rec))
+
+
 def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config,
-         llm=None) -> Plan:
+         llm=None, movie=None) -> Plan:
     t = decision.type
 
     if t == TV:
@@ -89,17 +105,21 @@ def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config,
         return Plan(TV, rel, cfg.tv_dir, rec.file_path, preserve_mtime=False)
 
     if t == MOVIE:
-        raw_title = llm.clean_title if (llm and llm.clean_title) else _YEAR.sub("", rec.title)
-        title = safe(raw_title.strip())
-        year = (llm.year if (llm and llm.year) else _movie_year(rec.title))
+        # priority: TMDB (authoritative) > LLM clean title > EPG title
+        if movie and movie.title:
+            title, year = safe(movie.title), movie.year
+        elif llm and llm.clean_title:
+            title, year = safe(llm.clean_title), (llm.year or _movie_year(rec.title))
+        else:
+            title, year = safe(_YEAR.sub("", rec.title).strip()), _movie_year(rec.title)
         if year:
             name = f"{title} ({year})"
             return Plan(MOVIE, f"{name}/{name}.mkv", cfg.movie_dir, rec.file_path, False)
         return Plan(MOVIE, f"{title}/{title}.mkv", cfg.movie_dir, rec.file_path, False,
-                    note="no year; TMDB/LLM enrichment recommended")
+                    note="no year; TMDB had no confident match")
 
     if t == SPORT:
-        parts = safe(_sport_matchup(rec))
+        parts = _sport_name(rec, llm)
         bcast = cfg.broadcaster_for(channel_name)
         if bcast:
             parts += f" - {bcast}"

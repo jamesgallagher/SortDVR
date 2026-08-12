@@ -7,10 +7,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sortdvr.classify import classify  # noqa: E402
+from sortdvr.classify import SPORT, Decision, classify  # noqa: E402
 from sortdvr.config import Config  # noqa: E402
+from sortdvr.llm import LLMResult  # noqa: E402
 from sortdvr.models import Recording  # noqa: E402
 from sortdvr.naming import Plan, plan  # noqa: E402
+from sortdvr.tmdb import Movie  # noqa: E402
 
 FIX = Path(__file__).parent / "fixtures" / "recordings_20260812.json"
 CFG = Config(dispatcharr_url="x", api_key="x",
@@ -76,6 +78,25 @@ def test_sport_matchup_from_description():
     assert p.rel_path.startswith(
         "The Hundred - Manchester Super Giants Women v Sunrisers Leeds Women")
     assert "A chance to see" not in p.rel_path  # description tail not swallowed
+
+
+def test_sport_gold_standard_from_llm():
+    """Competition + full teams + sport, from the LLM's structured extraction."""
+    rec = _recs()[87]  # 'Sharks v All Blacks' on NZ | SKY Sport 1
+    llm = LLMResult("SPORT", 0.9, sport="Rugby", competition="Greatest Rivalry Tour",
+                    home_team="Sharks", away_team="All Blacks")
+    p = plan(rec, Decision(SPORT, 0.75, "dedicated sport channel"),
+             "NZ | SKY Sport 1", CFG, llm=llm)
+    assert re.fullmatch(
+        r"Greatest Rivalry Tour - Sharks vs All Blacks \(Rugby\) - Sky NZ_20\d{6}_\d{6}\.mkv",
+        p.rel_path), p.rel_path
+
+
+def test_movie_prefers_tmdb_over_llm_and_epg():
+    p = plan(_recs()[88], Decision("MOVIE", 0.8, "movie channel"), "Sky Cinema Premiere",
+             CFG, llm=LLMResult("MOVIE", 0.9, clean_title="Normal"),
+             movie=Movie(title="Normal", year="2025"))
+    assert p.rel_path == "Normal (2025)/Normal (2025).mkv"
 
 
 if __name__ == "__main__":

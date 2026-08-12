@@ -63,6 +63,7 @@ class Config:
     tz: str = "UTC"
     provider: str = "none"  # gemini | groq | none
     llm_api_key: str = ""
+    tmdb_api_key: str = ""
     comskip_enabled: bool = True
     settle_minutes: int = 15
     poll_interval: int = 30
@@ -104,6 +105,7 @@ class Config:
             tz=os.environ.get("TZ", "UTC"),
             provider=os.environ.get("LLM_PROVIDER", "none").lower(),
             llm_api_key=os.environ.get("LLM_API_KEY", ""),
+            tmdb_api_key=os.environ.get("TMDB_API_KEY", ""),
             comskip_enabled=os.environ.get("COMSKIP_ENABLED", "true").lower() != "false",
             settle_minutes=int(os.environ.get("SETTLE_MINUTES", "15")),
             poll_interval=int(os.environ.get("POLL_INTERVAL", "30")),

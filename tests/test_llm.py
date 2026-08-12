@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import sortdvr.llm as llm_mod  # noqa: E402
-from sortdvr.classify import MOVIE, REVIEW, Decision, refine  # noqa: E402
+from sortdvr.classify import MOVIE, REVIEW, SPORT, Decision, refine  # noqa: E402
 from sortdvr.config import Config  # noqa: E402
 from sortdvr.llm import LLMResult, second_pass  # noqa: E402
 from sortdvr.models import Recording  # noqa: E402
@@ -62,6 +62,18 @@ def test_refine_promotes_confident_review():
 def test_refine_ignores_low_confidence():
     out = refine(Decision(REVIEW, 0.0, "no signal"), LLMResult("SPORT", 0.3))
     assert out.type == REVIEW
+
+
+def test_refine_overrides_weak_deterministic():
+    # footy panel show on a sports channel: SPORT 0.75, LLM confidently says TV
+    out = refine(Decision(SPORT, 0.75, "dedicated sport channel"), LLMResult("TV", 0.9))
+    assert out.type == "TV" and "override" in out.reason
+
+
+def test_refine_keeps_confident_deterministic():
+    # a confident deterministic call is never overridden
+    out = refine(Decision(SPORT, 0.9, "versus + sport token"), LLMResult("TV", 0.95))
+    assert out.type == SPORT
 
 
 def test_movie_plan_uses_llm_title_and_year():

@@ -13,8 +13,8 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from sortdvr import __version__
-from sortdvr.classify import REVIEW, classify, refine
+from sortdvr import __version__, tmdb
+from sortdvr.classify import MOVIE, REVIEW, classify, refine
 from sortdvr.config import Config
 from sortdvr.dispatcharr import Dispatcharr, DispatcharrError
 from sortdvr.llm import build_prompt, second_pass
@@ -22,6 +22,13 @@ from sortdvr.models import Recording
 from sortdvr.mover import move
 from sortdvr.naming import plan
 from sortdvr.state import State
+
+
+def _record_year(rec: Recording) -> int | None:
+    try:
+        return int(rec.start_time[:4])
+    except (ValueError, TypeError):
+        return None
 
 
 def _buckets(cfg: Config, recs: list[Recording]):
@@ -65,8 +72,12 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
                     print(f"       | {line}")
             llm = second_pass(r, ch, cfg)
             if llm:
-                print(f"   pass 2 → {llm.type} conf={llm.confidence:.2f} "
-                      f"title={llm.clean_title!r} year={llm.year or '-'}")
+                if llm.type == "SPORT":
+                    print(f"   pass 2 → SPORT conf={llm.confidence:.2f} sport={llm.sport!r} "
+                          f"comp={llm.competition!r} {llm.home_team!r} vs {llm.away_team!r}")
+                else:
+                    print(f"   pass 2 → {llm.type} conf={llm.confidence:.2f} "
+                          f"title={llm.clean_title!r} year={llm.year or '-'}")
                 if cfg.verbose and llm.reasoning:
                     print(f"       reasoning: {llm.reasoning}")
             else:
@@ -75,7 +86,17 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
             print("   pass 2 → skipped (deterministic result is confident)")
 
         d = refine(d0, llm)
-        p = plan(r, d, ch, cfg, llm=llm)
+
+        movie = None
+        if d.type == MOVIE and cfg.tmdb_api_key:
+            title = llm.clean_title if (llm and llm.clean_title) else r.title
+            movie = tmdb.lookup(title, r.description, cfg.tmdb_api_key, _record_year(r))
+            if movie:
+                print(f"   pass 3 (TMDB) → {movie.title!r} ({movie.year or '-'})")
+            else:
+                print("   pass 3 (TMDB) → no confident match")
+
+        p = plan(r, d, ch, cfg, llm=llm, movie=movie)
         res = move(p, go=go)
         st = "routed" if res.status == "moved" else ("review" if d.type == REVIEW else "classified")
         state.record(r.id, st, decision=d.type, confidence=d.confidence,
