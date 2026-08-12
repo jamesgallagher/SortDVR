@@ -31,8 +31,15 @@ _MINI_TOKENS = {"mini"}
 
 
 def sport_variant(rec: Recording) -> str:
-    """'HLS' | 'Mini' | '' from the title + description."""
-    toks = {t.lower() for t in _TOKEN_SPLIT.split(f"{rec.title} {rec.description}") if t}
+    """'HLS' | 'Mini' | '' from the TITLE only.
+
+    The description is deliberately NOT used: "Highlights from the final where X
+    won..." is prose about a full match, not a highlights broadcast, and it
+    produced false positives. Genuine highlights/mini broadcasts carry the token
+    in the title (as SpoilerFree's own detect_variant assumes). Duration can't
+    disambiguate either — partial recordings are short regardless of variant.
+    """
+    toks = {t.lower() for t in _TOKEN_SPLIT.split(rec.title) if t}
     if toks & _HIGHLIGHTS_TOKENS:
         return "HLS"
     if toks & _MINI_TOKENS:
@@ -98,9 +105,16 @@ def _sport_name(rec: Recording, llm) -> str:
     matcher keys on; competition is a helpful extra. Falls back to the raw
     matchup when the LLM is absent or gave no usable participants.
     """
-    if llm and llm.type == SPORT and ((llm.home_team and llm.away_team) or llm.event_name):
-        core = f"{llm.home_team} vs {llm.away_team}" if llm.home_team and llm.away_team \
-            else llm.event_name.strip()
+    if llm and llm.type == SPORT and (llm.home_team or llm.away_team or llm.event_name):
+        h, a, ev = llm.home_team.strip(), llm.away_team.strip(), llm.event_name.strip()
+        if h and a:
+            core = f"{h} vs {a}"
+        elif h or a:
+            # only one team known (incomplete EPG) — keep it, don't drop to event_name;
+            # SpoilerFree's league+date fallback fuzzy-matches the one participant.
+            core = f"{h or a} - {ev}" if ev else (h or a)
+        else:
+            core = ev
         name = f"{llm.competition.strip()} - {core}" if llm.competition.strip() else core
         if llm.sport.strip():
             name = f"{name} ({llm.sport.strip()})"

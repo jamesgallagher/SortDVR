@@ -99,12 +99,23 @@ def _sport_rec(title: str, description: str = "") -> Recording:
     })
 
 
-def test_sport_highlights_tag_lifted_from_description():
-    rec = _sport_rec("Sharks v All Blacks", "Highlights of the tour match at Kings Park.")
+def test_sport_highlights_tag_from_title():
+    rec = _sport_rec("Sharks v All Blacks HLS")
     llm = LLMResult("SPORT", 0.9, sport="Rugby", competition="Greatest Rivalry Tour",
                     home_team="Sharks", away_team="All Blacks")
     p = plan(rec, Decision(SPORT, 0.9, "versus"), "Sky Sport", CFG, llm=llm)
     assert "(HLS)" in p.rel_path, p.rel_path
+
+
+def test_sport_no_highlights_tag_from_description_prose():
+    # "Highlights from the final..." is prose about a full match — must NOT tag
+    rec = _sport_rec("UEFA Conference League Final",
+                     "Highlights from the 2026 final where Crystal Palace won.")
+    llm = LLMResult("SPORT", 0.9, sport="Soccer", competition="UEFA Conference League",
+                    home_team="Crystal Palace", away_team="", event_name="Final")
+    p = plan(rec, Decision(SPORT, 0.9, "sport channel"), "TNT Sports", CFG, llm=llm)
+    assert "(HLS)" not in p.rel_path, p.rel_path
+    assert "Crystal Palace" in p.rel_path, p.rel_path  # single known team kept
 
 
 def test_sport_mini_tag_from_title():
