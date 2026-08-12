@@ -67,6 +67,7 @@ class Config:
     settle_minutes: int = 15
     poll_interval: int = 30
     db_path: str = "sortdvr.db"
+    verbose: bool = True
     whitelist: tuple[str, ...] = ()
     movie_channel_keywords: tuple[str, ...] = DEFAULT_MOVIE_CHANNEL_KEYWORDS
     sport_channel_keywords: tuple[str, ...] = DEFAULT_SPORT_CHANNEL_KEYWORDS
@@ -107,5 +108,6 @@ class Config:
             settle_minutes=int(os.environ.get("SETTLE_MINUTES", "15")),
             poll_interval=int(os.environ.get("POLL_INTERVAL", "30")),
             db_path=os.environ.get("DB_PATH", "sortdvr.db"),
+            verbose=os.environ.get("VERBOSE", "true").strip().lower() != "false",
             whitelist=whitelist,
         )

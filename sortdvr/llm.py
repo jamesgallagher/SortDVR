@@ -11,12 +11,18 @@ Tests monkeypatch ``_call`` to avoid network.
 from __future__ import annotations
 
 import json
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+from sortdvr import __version__
 from sortdvr.config import Config
 from sortdvr.models import Recording
+
+# Groq/Gemini sit behind Cloudflare, which 403s the default urllib User-Agent
+# as bot traffic. A real UA is required or every call fails.
+_USER_AGENT = f"SortDVR/{__version__}"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -42,7 +48,7 @@ class LLMResult:
     reasoning: str = ""
 
 
-def _build_prompt(rec: Recording, channel_name: str) -> str:
+def build_prompt(rec: Recording, channel_name: str) -> str:
     lines = [f"Filename: {rec.file_name}", f"Title: {rec.title}", f"Channel: {channel_name}"]
     if rec.sub_title:
         lines.append(f"Sub-title: {rec.sub_title}")
@@ -57,7 +63,7 @@ def _build_prompt(rec: Recording, channel_name: str) -> str:
 def _post(url: str, headers: dict, payload: dict, timeout: int = 30) -> dict:
     req = urllib.request.Request(
         url, data=json.dumps(payload).encode(),
-        headers={**headers, "Content-Type": "application/json"},
+        headers={**headers, "Content-Type": "application/json", "User-Agent": _USER_AGENT},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
@@ -100,7 +106,7 @@ def second_pass(rec: Recording, channel_name: str, cfg: Config) -> LLMResult | N
     if cfg.provider == "none" or not cfg.llm_api_key:
         return None
     try:
-        data = json.loads(_call(_build_prompt(rec, channel_name), cfg))
+        data = json.loads(_call(build_prompt(rec, channel_name), cfg))
         typ = _TYPE_MAP.get(str(data.get("type", "")).lower())
         if not typ:
             return None
@@ -112,5 +118,10 @@ def second_pass(rec: Recording, channel_name: str, cfg: Config) -> LLMResult | N
             year=str(year) if year else "",
             reasoning=str(data.get("reasoning") or ""),
         )
-    except (urllib.error.URLError, json.JSONDecodeError, KeyError, ValueError, TypeError):
+    except urllib.error.HTTPError as e:
+        body = e.read()[:200].decode(errors="replace") if hasattr(e, "read") else ""
+        print(f"   [llm] {cfg.provider} HTTP {e.code}: {body}", file=sys.stderr)
+        return None
+    except Exception as e:  # never let a second-pass failure break routing
+        print(f"   [llm] {cfg.provider} failed: {type(e).__name__}: {e}", file=sys.stderr)
         return None
