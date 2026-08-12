@@ -77,7 +77,8 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
                 reused += 1
                 continue
             dtype = prior["decision"] or ""
-            res = move_to(r.file_path, prior["dest"], dtype in ("SPORT", "REVIEW"), go=True)
+            res = move_to(r.file_path, prior["dest"], dtype in ("SPORT", "REVIEW"),
+                          go=True, inbox=cfg.inbox)
             if res.status == "moved":
                 state.record(r.id, "routed", decision=dtype, dest=prior["dest"], title=r.title)
             elif res.status == "missing-source":
@@ -127,7 +128,7 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
                 print("   pass 3 (TMDB) → no confident match")
 
         p = plan(r, d, ch, cfg, llm=llm, movie=movie)
-        res = move(p, go=go)
+        res = move(p, go=go, inbox=cfg.inbox)
         if res.status == "moved":
             st = "routed"
         elif res.status == "missing-source":

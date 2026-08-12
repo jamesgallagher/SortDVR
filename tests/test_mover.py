@@ -51,6 +51,21 @@ def test_never_overwrites_appends_counter(tmp_path):
     assert (dest_dir / "A.mkv").read_bytes() == b"original"  # untouched
 
 
+def test_resolves_by_basename_in_inbox(tmp_path):
+    # API reports a stale absolute path; the real file sits in the inbox by name
+    inbox = tmp_path / "recordings"
+    inbox.mkdir()
+    real = inbox / "The Block.mkv"
+    real.write_bytes(b"x" * 50)
+    dest_dir = tmp_path / "tv"
+    plan = Plan("TV", "The Block/S01/The Block.mkv", str(dest_dir),
+                "/data/The Block.mkv", preserve_mtime=False)  # stale path
+    r = move(plan, go=True, inbox=str(inbox))
+    assert r.status == "moved"
+    assert not real.exists()
+    assert (dest_dir / "The Block" / "S01" / "The Block.mkv").is_file()
+
+
 def test_missing_source(tmp_path):
     r = move(_plan(tmp_path / "nope.mkv", tmp_path / "out", "A.mkv"), go=True)
     assert r.status == "missing-source"

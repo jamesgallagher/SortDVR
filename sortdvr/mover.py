@@ -25,6 +25,18 @@ class MoveResult:
     detail: str = ""
 
 
+def _resolve(source_path: str, inbox: str) -> Path:
+    """The file as the API reports it, or — if that exact path is missing — the
+    same basename inside the watched folder. Handles Dispatcharr reporting a
+    recordings root (e.g. /data/X) that differs from where the file actually
+    landed (/data/recordings/X), as long as it's flat in the inbox."""
+    p = Path(source_path)
+    if p.is_file() or not inbox:
+        return p
+    alt = Path(inbox) / p.name
+    return alt if alt.is_file() else p
+
+
 def _unique(dest: Path) -> Path:
     """Return dest, or dest with a `_N` suffix if it already exists."""
     if not dest.exists():
@@ -51,7 +63,8 @@ def _move_preserving_mtime(src: Path, dest: Path) -> None:
     src.unlink()
 
 
-def move_to(source_path: str, dest_path: str, preserve_mtime: bool, *, go: bool) -> MoveResult:
+def move_to(source_path: str, dest_path: str, preserve_mtime: bool, *, go: bool,
+            inbox: str = "") -> MoveResult:
     """Move a source to an already-decided absolute dest (cached-decision reuse,
     so we never re-run the LLM for a recording we've already classified)."""
     src = Path(source_path)
@@ -59,6 +72,7 @@ def move_to(source_path: str, dest_path: str, preserve_mtime: bool, *, go: bool)
         return MoveResult("dry-run", str(src), dest_path)
     if not dest_path or not dest_path.startswith("/"):
         return MoveResult("skipped-no-dest", str(src), dest_path, "no absolute destination")
+    src = _resolve(source_path, inbox)
     if not src.is_file():
         return MoveResult("missing-source", str(src), dest_path, "source file not found")
     dest = _unique(Path(dest_path))
@@ -70,7 +84,7 @@ def move_to(source_path: str, dest_path: str, preserve_mtime: bool, *, go: bool)
     return MoveResult("moved", str(src), str(dest))
 
 
-def move(plan: Plan, *, go: bool) -> MoveResult:
+def move(plan: Plan, *, go: bool, inbox: str = "") -> MoveResult:
     """Execute (or, when go=False, describe) the move for one plan."""
     src = Path(plan.source_path)
 
@@ -80,6 +94,7 @@ def move(plan: Plan, *, go: bool) -> MoveResult:
     if not plan.dest_dir:
         return MoveResult("skipped-no-dest", str(src), plan.rel_path,
                           f"no destination dir configured for {plan.type}")
+    src = _resolve(plan.source_path, inbox)
     if not src.is_file():
         return MoveResult("missing-source", str(src), plan.dest_path,
                           "source file not found (run on the host that holds it)")
