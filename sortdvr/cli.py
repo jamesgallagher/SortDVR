@@ -35,9 +35,10 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool) -> None:
         if state.is_routed(r.id):
             continue
         ch = api.channel_name(r.channel_id) if r.channel_id else ""
-        d = classify(r, ch, cfg)
-        llm = second_pass(r, ch, cfg) if d.needs_second_pass else None
-        d = refine(d, llm)
+        d0 = classify(r, ch, cfg)
+        attempted = d0.needs_second_pass
+        llm = second_pass(r, ch, cfg) if attempted else None
+        d = refine(d0, llm)
         p = plan(r, d, ch, cfg, llm=llm)
         res = move(p, go=go)
         if res.status == "moved":
@@ -50,6 +51,12 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool) -> None:
                      dest=res.dest, title=r.title)
         print(f"[{d.type:<6}] {res.status:<15} {r.title!r}")
         print(f"           -> {res.dest}")
+        if attempted:
+            if llm:
+                print(f"           2nd-pass({cfg.provider}): {llm.type} {llm.confidence:.2f} "
+                      f"title={llm.clean_title!r} year={llm.year or '-'}")
+            else:
+                print(f"           2nd-pass({cfg.provider}): no result (kept deterministic)")
         if res.detail:
             print(f"           ({res.detail})")
 
