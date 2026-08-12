@@ -11,9 +11,10 @@ import argparse
 import sys
 import time
 
-from sortdvr.classify import REVIEW, classify
+from sortdvr.classify import REVIEW, classify, refine
 from sortdvr.config import Config
 from sortdvr.dispatcharr import Dispatcharr, DispatcharrError
+from sortdvr.llm import second_pass
 from sortdvr.models import Recording
 from sortdvr.mover import move
 from sortdvr.naming import plan
@@ -34,7 +35,9 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool) -> None:
             continue
         ch = api.channel_name(r.channel_id) if r.channel_id else ""
         d = classify(r, ch, cfg)
-        p = plan(r, d, ch, cfg)
+        llm = second_pass(r, ch, cfg) if d.needs_second_pass else None
+        d = refine(d, llm)
+        p = plan(r, d, ch, cfg, llm=llm)
         res = move(p, go=go)
         if res.status == "moved":
             st = "routed"

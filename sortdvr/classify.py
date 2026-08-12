@@ -86,3 +86,17 @@ def classify(rec: Recording, channel_name: str, cfg: Config) -> Decision:
 
     # 5. ambiguous
     return Decision(REVIEW, 0.0, "no deterministic signal", needs_second_pass=llm)
+
+
+def refine(decision: Decision, llm) -> Decision:
+    """Apply an LLM second-pass result (``sortdvr.llm.LLMResult`` or None).
+
+    Only promotes an ambiguous REVIEW to a confident type; it never overrides a
+    confident deterministic signal (those never request a second pass). Movie
+    title/year enrichment is applied separately in ``naming.plan``.
+    """
+    if llm is None:
+        return decision
+    if decision.type == REVIEW and llm.confidence >= 0.6:
+        return Decision(llm.type, llm.confidence, "llm second pass")
+    return decision

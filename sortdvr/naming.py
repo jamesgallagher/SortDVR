@@ -74,7 +74,8 @@ def _sport_matchup(rec: Recording) -> str:
     return title  # competition-only; SpoilerFree still attempts identification
 
 
-def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config) -> Plan:
+def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config,
+         llm=None) -> Plan:
     t = decision.type
 
     if t == TV:
@@ -88,8 +89,9 @@ def plan(rec: Recording, decision: Decision, channel_name: str, cfg: Config) -> 
         return Plan(TV, rel, cfg.tv_dir, rec.file_path, preserve_mtime=False)
 
     if t == MOVIE:
-        title = safe(_YEAR.sub("", rec.title).strip())
-        year = _movie_year(rec.title)
+        raw_title = llm.clean_title if (llm and llm.clean_title) else _YEAR.sub("", rec.title)
+        title = safe(raw_title.strip())
+        year = (llm.year if (llm and llm.year) else _movie_year(rec.title))
         if year:
             name = f"{title} ({year})"
             return Plan(MOVIE, f"{name}/{name}.mkv", cfg.movie_dir, rec.file_path, False)
