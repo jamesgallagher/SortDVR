@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Stream logs immediately to `docker logs` (no stdout buffering in the container).
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY sortdvr ./sortdvr
