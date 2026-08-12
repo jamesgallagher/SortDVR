@@ -1,0 +1,16 @@
+[project]
+name = "sortdvr"
+version = "0.1.0"
+description = "DVR recording classifier/router (TV / Movie / Sport) that sits in front of Plex and SpoilerFreePlexSports"
+requires-python = ">=3.11"
+dependencies = []  # v1 client uses stdlib; httpx/LLM SDKs added when second pass lands
+
+[project.scripts]
+sortdvr = "sortdvr.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["sortdvr"]
