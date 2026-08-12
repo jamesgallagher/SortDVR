@@ -1,0 +1,30 @@
+# SortDVR must run where it can see the SAME files Dispatcharr wrote — mount the
+# recordings share at the SAME path the API reports in file_path (/data/recordings).
+# Start in dry-run (the default CMD); switch to `--go` only once the logs look right.
+services:
+  sortdvr:
+    build: .
+    container_name: sortdvr
+    environment:
+      DISPATCHARR_URL: http://192.168.0.148:9191
+      DISPATCHARR_API_KEY: ${DISPATCHARR_API_KEY:?set in a .env next to this file}
+      TZ: UTC
+      # Destinations (as seen INSIDE this container):
+      TV_DIR: /media/TV_Shows
+      MOVIE_DIR: /media/Movies
+      SPORT_DIR: /watch          # = SpoilerFreePlexSports' watch folder
+      LLM_PROVIDER: none         # gemini | groq | none
+      # LLM_API_KEY: ...
+      COMSKIP_ENABLED: "true"
+      POLL_INTERVAL: "30"
+    volumes:
+      # left = host path, right = container path. The recordings path MUST match
+      # Dispatcharr's file_path exactly.
+      - /mnt/user/recordings:/data/recordings
+      - /mnt/user/media/TV_Shows:/media/TV_Shows
+      - /mnt/user/media/Movies:/media/Movies
+      - /mnt/user/appdata/spoilerfreeplexsports/watch:/watch
+      - ./data:/app/data         # SQLite state persistence
+    restart: unless-stopped
+    # To actually move files instead of dry-running:
+    # command: ["sortdvr", "watch", "--go"]

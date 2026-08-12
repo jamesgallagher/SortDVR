@@ -16,9 +16,16 @@ the filename is a best-effort fallback. See
 
 ## Status
 
-v1, in progress. The API-first spine is built and validated against live data:
-poll recordings → gate on `completed` + Comskip done → resolve channel → classify.
-**Dry-run only** so far (`scan` prints intended actions; nothing is moved yet).
+v1, in progress. The full pipeline is built and tested — poll recordings →
+gate on `completed` + Comskip done → resolve channel → classify → plan Plex/sport
+path → **move** (MOVE, mtime preserved, never overwrites). Validated against live
+data. Moves are **dry-run by default**; pass `--go` to act. Still to come: LLM
+second pass, orphan/backstop watcher, Comskip max-wait hardening.
+
+> **Where it runs:** SortDVR must run where it can see the files Dispatcharr
+> wrote — mount the recordings share at the **same path** the API reports in
+> `file_path` (`/data/recordings`). It reaches Dispatcharr over the network but
+> needs the files locally to move them.
 
 ## Setup
 
@@ -46,5 +53,24 @@ python -m sortdvr.cli scan
 
 ## Commands
 
-- `sortdvr scan` — one pass, print intended classifications (dry-run).
-- `sortdvr watch` — repeat every `POLL_INTERVAL`.
+- `sortdvr scan` — inspect (read-only): ready recordings + planned destinations.
+- `sortdvr run` — one routing pass. Dry-run unless `--go`.
+- `sortdvr watch` — routing loop every `POLL_INTERVAL`. Dry-run unless `--go`.
+
+`--go` is what actually moves files. Always watch a dry-run first.
+
+## Deploy (Docker)
+
+```bash
+echo "DISPATCHARR_API_KEY=your-key" > .env   # gitignored
+docker compose up -d --build                 # starts in dry-run
+docker compose logs -f sortdvr               # confirm the planned moves look right
+```
+
+Then enable moving by uncommenting `command: ["sortdvr","watch","--go"]` in
+`docker-compose.yml` and `docker compose up -d`. Edit the volume paths to match
+your host; `/data/recordings` must equal Dispatcharr's `file_path` root.
+
+| Extra var | Default | Notes |
+|-----------|---------|-------|
+| `DB_PATH` | `sortdvr.db` | SQLite state; set to a mounted path in Docker |

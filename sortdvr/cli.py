@@ -92,7 +92,7 @@ def main(argv=None) -> int:
 
     cfg = Config.from_env()
     api = Dispatcharr(cfg.dispatcharr_url, cfg.api_key)
-    state = State()
+    state = State(cfg.db_path)
     try:
         if args.command == "scan":
             _scan(cfg, api, state)
