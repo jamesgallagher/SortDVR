@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>SortDVR</Name>
+  <Repository>ghcr.io/jamesgallagher/sortdvr:latest</Repository>
+  <Registry>https://github.com/jamesgallagher/SortDVR/pkgs/container/sortdvr</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jamesgallagher/SortDVR/issues</Support>
+  <Project>https://github.com/jamesgallagher/SortDVR</Project>
+  <Overview>SortDVR classifies each finished Dispatcharr DVR recording as TV, Movie, or Sport and moves it to the right folder — Plex-format for TV/Movie (Plex finishes from the name) and a raw broadcaster-tagged handoff for Sport into SpoilerFreePlexSports' watch folder. It uses the Dispatcharr API as the source of truth (waits for the recording to complete and Comskip to finish before touching a file).&#13;&#10;&#13;&#10;IMPORTANT: The "Recordings" path MUST point at the same share Dispatcharr records into, mounted at /data/recordings (the path the API reports in file_path). SortDVR starts in DRY-RUN — it logs the moves it WOULD make and touches nothing. Watch the logs, and only then set "Actually move files" to true.</Overview>
+  <Category>MediaApp:Video Tools:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/jamesgallagher/SortDVR/main/unraid/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>A running Dispatcharr instance with an API key, and (for Sport) SpoilerFreePlexSports.</Requires>
+
+  <Config Name="Recordings (source)" Target="/data/recordings" Default="/mnt/user/recordings" Mode="rw" Description="MUST match Dispatcharr's recordings share — the path its API reports in file_path. Files are MOVED out of here." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/recordings</Config>
+  <Config Name="TV destination" Target="/media/TV_Shows" Default="/mnt/user/media/TV_Shows" Mode="rw" Description="Where TV episodes are moved (Plex TV library)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media/TV_Shows</Config>
+  <Config Name="Movie destination" Target="/media/Movies" Default="/mnt/user/media/Movies" Mode="rw" Description="Where movies are moved (Plex movie library)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media/Movies</Config>
+  <Config Name="Sport destination" Target="/watch" Default="/mnt/user/appdata/spoilerfreeplexsports/watch" Mode="rw" Description="SpoilerFreePlexSports' watch folder — Sport is dropped here for it to identify." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spoilerfreeplexsports/watch</Config>
+  <Config Name="App state" Target="/app/data" Default="/mnt/user/appdata/sortdvr" Mode="rw" Description="SQLite state (idempotency + decision log)." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/sortdvr</Config>
+
+  <Config Name="Dispatcharr URL" Target="DISPATCHARR_URL" Default="http://192.168.0.148:9191" Mode="" Description="Base URL of your Dispatcharr instance." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.0.148:9191</Config>
+  <Config Name="Dispatcharr API key" Target="DISPATCHARR_API_KEY" Default="" Mode="" Description="Generate in Dispatcharr (POST /api/accounts/api-keys/generate/). Sent as X-API-Key." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Actually move files (GO)" Target="SORTDVR_GO" Default="false" Mode="" Description="false = DRY-RUN (log only, move nothing). Set true once the dry-run logs look correct." Type="Variable" Display="always" Required="true" Mask="false">false</Config>
+  <Config Name="TV_DIR" Target="TV_DIR" Default="/media/TV_Shows" Mode="" Description="Container path for TV output (must equal the TV destination mount target)." Type="Variable" Display="advanced" Required="true" Mask="false">/media/TV_Shows</Config>
+  <Config Name="MOVIE_DIR" Target="MOVIE_DIR" Default="/media/Movies" Mode="" Description="Container path for movie output (must equal the Movie destination mount target)." Type="Variable" Display="advanced" Required="true" Mask="false">/media/Movies</Config>
+  <Config Name="SPORT_DIR" Target="SPORT_DIR" Default="/watch" Mode="" Description="Container path for sport output (must equal the Sport destination mount target)." Type="Variable" Display="advanced" Required="true" Mask="false">/watch</Config>
+  <Config Name="Second-pass provider" Target="LLM_PROVIDER" Default="none" Mode="" Description="none | groq | gemini — LLM used only for ambiguous cases and movie title/year cleanup." Type="Variable" Display="advanced" Required="false" Mask="false">none</Config>
+  <Config Name="LLM API key" Target="LLM_API_KEY" Default="" Mode="" Description="Required only if a second-pass provider is set." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Comskip enabled" Target="COMSKIP_ENABLED" Default="true" Mode="" Description="true if Dispatcharr runs Comskip — SortDVR then waits for Comskip to finish before moving." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="Poll interval (s)" Target="POLL_INTERVAL" Default="30" Mode="" Description="How often to poll the Dispatcharr API." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+  <Config Name="Timezone" Target="TZ" Default="UTC" Mode="" Description="Match Dispatcharr (UTC by default)." Type="Variable" Display="advanced" Required="false" Mask="false">UTC</Config>
+</Container>

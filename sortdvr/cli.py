@@ -8,6 +8,7 @@ moved yet — that lands once the classifier is validated against live data.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 
@@ -90,8 +91,11 @@ def main(argv=None) -> int:
                     help="scan: inspect (read-only). run: one routing pass. "
                          "watch: routing loop on POLL_INTERVAL.")
     ap.add_argument("--go", action="store_true",
-                    help="actually move files (run/watch); default is dry-run")
+                    help="actually move files (run/watch); default is dry-run. "
+                         "Can also be set via env SORTDVR_GO=true.")
     args = ap.parse_args(argv)
+
+    go = args.go or os.environ.get("SORTDVR_GO", "").strip().lower() in ("1", "true", "yes", "on")
 
     cfg = Config.from_env()
     api = Dispatcharr(cfg.dispatcharr_url, cfg.api_key)
@@ -100,10 +104,10 @@ def main(argv=None) -> int:
         if args.command == "scan":
             _scan(cfg, api, state)
         elif args.command == "run":
-            _run(cfg, api, state, args.go)
+            _run(cfg, api, state, go)
         else:
             while True:
-                _run(cfg, api, state, args.go)
+                _run(cfg, api, state, go)
                 time.sleep(cfg.poll_interval)
     except DispatcharrError as e:
         print(f"error: {e}", file=sys.stderr)
