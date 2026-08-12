@@ -9,10 +9,9 @@ services:
       DISPATCHARR_URL: http://192.168.0.148:9191
       DISPATCHARR_API_KEY: ${DISPATCHARR_API_KEY:?set in a .env next to this file}
       TZ: UTC
-      # Destinations (as seen INSIDE this container):
-      TV_DIR: /media/TV_Shows
-      MOVIE_DIR: /media/Movies
-      SPORT_DIR: /watch          # = SpoilerFreePlexSports' watch folder
+      # Destinations default to the container mount targets below (/media/TV_Shows,
+      # /media/Movies, /watch), so TV_DIR/MOVIE_DIR/SPORT_DIR only need setting to
+      # override them. The volume mounts are what matter.
       LLM_PROVIDER: none         # gemini | groq | none
       # LLM_API_KEY: ...
       COMSKIP_ENABLED: "true"

@@ -54,10 +54,12 @@ DEFAULT_BROADCASTER_MAP: tuple[tuple[str, str], ...] = (
 class Config:
     dispatcharr_url: str
     api_key: str
+    # Defaults are the standard container mount targets, so the destination env
+    # vars are optional — the volume mount alone is enough (see the Unraid template).
     inbox: str = "/data/recordings"
-    tv_dir: str = ""
-    movie_dir: str = ""
-    sport_dir: str = ""
+    tv_dir: str = "/media/TV_Shows"
+    movie_dir: str = "/media/Movies"
+    sport_dir: str = "/watch"
     tz: str = "UTC"
     provider: str = "none"  # gemini | groq | none
     llm_api_key: str = ""
@@ -95,9 +97,9 @@ class Config:
             dispatcharr_url=url,
             api_key=key,
             inbox=os.environ.get("INBOX", "/data/recordings"),
-            tv_dir=os.environ.get("TV_DIR", ""),
-            movie_dir=os.environ.get("MOVIE_DIR", ""),
-            sport_dir=os.environ.get("SPORT_DIR", ""),
+            tv_dir=os.environ.get("TV_DIR", "/media/TV_Shows"),
+            movie_dir=os.environ.get("MOVIE_DIR", "/media/Movies"),
+            sport_dir=os.environ.get("SPORT_DIR", "/watch"),
             tz=os.environ.get("TZ", "UTC"),
             provider=os.environ.get("LLM_PROVIDER", "none").lower(),
             llm_api_key=os.environ.get("LLM_API_KEY", ""),
