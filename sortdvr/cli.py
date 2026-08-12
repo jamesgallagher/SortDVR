@@ -59,8 +59,8 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
     reused = 0
     for r in sorted(ready, key=lambda x: x.start_time, reverse=True):
         prior = state.get(r.id)
-        if prior and prior["status"] == "routed":
-            continue  # already moved
+        if prior and prior["status"] in ("routed", "missing"):
+            continue  # done, or source gone — don't retry every pass
         if prior and prior["dest"]:
             # decided in an earlier pass — reuse it; NEVER re-call the LLM/TMDB.
             if not go:
@@ -70,6 +70,8 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
             res = move_to(r.file_path, prior["dest"], dtype in ("SPORT", "REVIEW"), go=True)
             if res.status == "moved":
                 state.record(r.id, "routed", decision=dtype, dest=prior["dest"], title=r.title)
+            elif res.status == "missing-source":
+                state.record(r.id, "missing", decision=dtype, dest=prior["dest"], title=r.title)
             print(f"\n> {r.title!r}  [cached {dtype}] {res.status} -> {res.dest}")
             continue
 
@@ -114,7 +116,14 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
 
         p = plan(r, d, ch, cfg, llm=llm, movie=movie)
         res = move(p, go=go)
-        st = "routed" if res.status == "moved" else ("review" if d.type == REVIEW else "classified")
+        if res.status == "moved":
+            st = "routed"
+        elif res.status == "missing-source":
+            st = "missing"
+        elif d.type == REVIEW:
+            st = "review"
+        else:
+            st = "classified"
         state.record(r.id, st, decision=d.type, confidence=d.confidence,
                      dest=res.dest, title=r.title)
 
