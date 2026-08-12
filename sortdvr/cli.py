@@ -24,6 +24,16 @@ from sortdvr.naming import plan
 from sortdvr.state import State
 
 
+def _inbox_hint(rec: Recording, cfg: Config) -> str | None:
+    """Explain a missing source when it's outside the watched recordings folder
+    (Dispatcharr and SortDVR disagreeing on the recordings path)."""
+    if rec.file_path and not rec.file_path.startswith(cfg.inbox):
+        return (f"   HINT: file_path {rec.file_path!r} is OUTSIDE the watched folder "
+                f"{cfg.inbox!r}. Dispatcharr wrote it somewhere SortDVR isn't mounted — "
+                f"align the recordings path/mounts.")
+    return None
+
+
 def _record_year(rec: Recording) -> int | None:
     try:
         return int(rec.start_time[:4])
@@ -73,6 +83,8 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
             elif res.status == "missing-source":
                 state.record(r.id, "missing", decision=dtype, dest=prior["dest"], title=r.title)
             print(f"\n> {r.title!r}  [cached {dtype}] {res.status} -> {res.dest}")
+            if res.status == "missing-source" and (hint := _inbox_hint(r, cfg)):
+                print(hint)
             continue
 
         ch = api.channel_name(r.channel_id) if r.channel_id else ""
@@ -134,6 +146,8 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
             print("   not moved (SORTDVR_GO=false - dry-run)")
         else:
             print(f"   {res.status}: {res.detail}")
+            if res.status == "missing-source" and (hint := _inbox_hint(r, cfg)):
+                print(hint)
 
     if reused:
         print(f"\n   {reused} already classified this session — skipped (no re-run, "
