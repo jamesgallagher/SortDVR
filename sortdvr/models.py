@@ -11,6 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 _TERMINAL_COMSKIP = {"completed", "skipped", "error"}
+# Final states with a kept file: ran to the end, or the user stopped it early
+# but chose to keep the partial recording.
+_FINAL_STATUSES = {"completed", "stopped"}
 
 
 @dataclass
@@ -74,13 +77,25 @@ class Recording:
     def start_time(self) -> str:
         return self.raw.get("start_time") or ""
 
+    @property
+    def bytes_written(self) -> int | None:
+        v = self.cp.get("bytes_written")
+        return v if isinstance(v, int) else None
+
     def has_file(self) -> bool:
         """True once the recording exists on disk with a lifecycle status."""
         return bool(self.file_path) and bool(self.status)
 
+    def is_empty(self) -> bool:
+        """A 0-byte recording (e.g. stopped before anything was written)."""
+        return self.bytes_written == 0
+
     def is_ready(self, comskip_enabled: bool) -> bool:
-        """Safe-to-process gate: completed AND (comskip done, if enabled)."""
-        if self.status != "completed":
+        """Safe-to-process gate: a final state (completed OR user-stopped-and-kept)
+        with real bytes AND (Comskip done, if enabled)."""
+        if self.status not in _FINAL_STATUSES:
+            return False
+        if self.is_empty():  # nothing to route
             return False
         if comskip_enabled:
             return self.comskip_status in _TERMINAL_COMSKIP

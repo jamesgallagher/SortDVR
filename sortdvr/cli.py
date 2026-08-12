@@ -32,26 +32,29 @@ def _record_year(rec: Recording) -> int | None:
 
 
 def _buckets(cfg: Config, recs: list[Recording]):
-    ready, waiting, pending = [], [], []
+    ready, waiting, pending, empty = [], [], [], []
     for r in recs:
         if not r.has_file():
             pending.append(r)
+        elif r.is_empty():
+            empty.append(r)
         elif not r.is_ready(cfg.comskip_enabled):
             waiting.append(r)
         else:
             ready.append(r)
-    return ready, waiting, pending
+    return ready, waiting, pending, empty
 
 
 def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) -> None:
     """Full pipeline: classify -> (LLM) -> plan -> move. Dry-run unless go=True."""
     recs = [Recording.from_api(d) for d in api.recordings()]
-    ready, waiting, pending = _buckets(cfg, recs)
+    ready, waiting, pending, empty = _buckets(cfg, recs)
     mode = "GO (moving files)" if go else "DRY-RUN (no moves)"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
     print(f"\n-- SortDVR v{__version__} | pass #{pass_no} | {now} | {mode} --")
     print(f"   recordings: {len(recs)} | ready: {len(ready)} | "
-          f"recording/comskip: {len(waiting)} | scheduled: {len(pending)}")
+          f"recording/comskip: {len(waiting)} | scheduled: {len(pending)} | "
+          f"empty(0-byte): {len(empty)}")
 
     reused = 0
     for r in sorted(ready, key=lambda x: x.start_time, reverse=True):
@@ -130,18 +133,11 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
 
 def _scan(cfg: Config, api: Dispatcharr, state: State) -> None:
     recs = [Recording.from_api(d) for d in api.recordings()]
-    ready, waiting, pending = [], [], []
-    for r in recs:
-        if not r.has_file():
-            pending.append(r)
-        elif not r.is_ready(cfg.comskip_enabled):
-            waiting.append(r)
-        else:
-            ready.append(r)
-
+    ready, waiting, pending, empty = _buckets(cfg, recs)
     print(
         f"recordings: {len(recs)} | ready: {len(ready)} | "
-        f"recording/comskip: {len(waiting)} | scheduled/no-file: {len(pending)}"
+        f"recording/comskip: {len(waiting)} | scheduled/no-file: {len(pending)} | "
+        f"empty(0-byte): {len(empty)}"
     )
     print("-" * 88)
     for r in sorted(ready, key=lambda x: x.start_time, reverse=True):

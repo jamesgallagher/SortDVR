@@ -83,6 +83,33 @@ def test_completed_without_comskip_holds_when_enabled():
     assert r.is_ready(comskip_enabled=False) is True   # released (comskip off)
 
 
+def _stopped(bytes_written, comskip="completed"):
+    cp = {"status": "stopped", "file_path": "/x.mkv", "program": {"title": "X"},
+          "bytes_written": bytes_written}
+    if comskip:
+        cp["comskip"] = {"status": comskip}
+    return Recording.from_api({"id": 1, "channel": 1, "custom_properties": cp})
+
+
+def test_stopped_partial_with_bytes_is_ready():
+    # user stopped early but kept the file — process it
+    r = _stopped(296_000_000, comskip="completed")
+    assert r.has_file() and not r.is_empty()
+    assert r.is_ready(comskip_enabled=True) is True
+
+
+def test_stopped_zero_byte_is_ignored():
+    r = _stopped(0, comskip=None)
+    assert r.is_empty() is True
+    assert r.is_ready(comskip_enabled=True) is False
+
+
+def test_stopped_partial_waits_for_comskip():
+    r = _stopped(1000, comskip=None)
+    assert r.is_ready(comskip_enabled=True) is False   # comskip not done yet
+    assert r.is_ready(comskip_enabled=False) is True
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

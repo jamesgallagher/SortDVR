@@ -37,7 +37,8 @@ DEFAULT_SPORT_CHANNEL_KEYWORDS = (
 # Longest/most-specific keys first — matching walks these in order.
 DEFAULT_BROADCASTER_MAP: tuple[tuple[str, str], ...] = (
     ("sky sport new zealand", "Sky NZ"),
-    ("nz | sky", "Sky NZ"),  # channels are named "NZ | SKY Sport 1"
+    ("nz | sky", "Sky NZ"),  # "NZ | SKY Sport 1"
+    ("nz sky", "Sky NZ"),    # "NZ SKY Sport 6"
     ("sky sports", "Sky"),
     ("sky sport", "Sky"),
     ("sky cinema", "Sky"),
