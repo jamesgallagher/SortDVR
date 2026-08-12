@@ -19,7 +19,7 @@ from sortdvr.config import Config
 from sortdvr.dispatcharr import Dispatcharr, DispatcharrError
 from sortdvr.llm import build_prompt, second_pass
 from sortdvr.models import Recording
-from sortdvr.mover import move
+from sortdvr.mover import move, move_to
 from sortdvr.naming import plan
 from sortdvr.state import State
 
@@ -53,10 +53,23 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
     print(f"   recordings: {len(recs)} | ready: {len(ready)} | "
           f"recording/comskip: {len(waiting)} | scheduled: {len(pending)}")
 
+    reused = 0
     for r in sorted(ready, key=lambda x: x.start_time, reverse=True):
-        if state.is_routed(r.id):
-            print(f"\n> {r.title!r} - already routed, skipping")
+        prior = state.get(r.id)
+        if prior and prior["status"] == "routed":
+            continue  # already moved
+        if prior and prior["dest"]:
+            # decided in an earlier pass — reuse it; NEVER re-call the LLM/TMDB.
+            if not go:
+                reused += 1
+                continue
+            dtype = prior["decision"] or ""
+            res = move_to(r.file_path, prior["dest"], dtype in ("SPORT", "REVIEW"), go=True)
+            if res.status == "moved":
+                state.record(r.id, "routed", decision=dtype, dest=prior["dest"], title=r.title)
+            print(f"\n> {r.title!r}  [cached {dtype}] {res.status} -> {res.dest}")
             continue
+
         ch = api.channel_name(r.channel_id) if r.channel_id else ""
         print(f"\n> {r.title!r}  ch={ch!r}")
         print(f"   file: {r.file_name}")
@@ -109,6 +122,10 @@ def _run(cfg: Config, api: Dispatcharr, state: State, go: bool, pass_no: int) ->
             print("   not moved (SORTDVR_GO=false - dry-run)")
         else:
             print(f"   {res.status}: {res.detail}")
+
+    if reused:
+        print(f"\n   {reused} already classified this session — skipped (no re-run, "
+              f"no LLM calls). Set SORTDVR_GO=true to move them.")
 
 
 def _scan(cfg: Config, api: Dispatcharr, state: State) -> None:
