@@ -25,9 +25,10 @@ from sortdvr.models import Recording
 _USER_AGENT = f"SortDVR/{__version__}"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-# Default model is set in config (openai/gpt-oss-120b). llama-3.3-70b-versatile
-# is decommissioned 2026-08-16. gpt-oss are reasoning models — see _groq.
-GEMINI_MODEL = "gemini-1.5-flash"
+# Models are set in config (groq_model / gemini_model). llama-3.3-70b-versatile
+# is decommissioned 2026-08-16; gemini-1.5/2.0-flash are retired. Both the
+# gpt-oss and current gemini-flash models are reasoning/thinking models — see
+# _groq (reasoning_effort) and _gemini (thinkingBudget).
 
 SYSTEM = (
     "You classify a single recorded TV broadcast as exactly one of: movie, sport, tv. "
@@ -107,11 +108,17 @@ def _groq(prompt: str, cfg: Config) -> str:
 
 def _gemini(prompt: str, cfg: Config) -> str:
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{GEMINI_MODEL}:generateContent?key={cfg.llm_api_key}")
+           f"{cfg.gemini_model}:generateContent?key={cfg.llm_api_key}")
     body = {
         "system_instruction": {"parts": [{"text": SYSTEM}]},
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"response_mime_type": "application/json", "temperature": 0},
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0,
+            # gemini-flash is a thinking model — disable it for mechanical tasks
+            # (Gemini's equivalent of Groq reasoning_effort=low): reliable, faster.
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     }
     out = _post(url, {}, body)
     return out["candidates"][0]["content"]["parts"][0]["text"]

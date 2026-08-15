@@ -65,6 +65,7 @@ class Config:
     provider: str = "none"  # gemini | groq | none
     llm_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"  # llama-3.3-70b decommissioned 2026-08-16
+    gemini_model: str = "gemini-flash-latest"  # gemini-1.5/2.0-flash are retired
     tmdb_api_key: str = ""
     comskip_enabled: bool = True
     settle_minutes: int = 15
@@ -108,6 +109,7 @@ class Config:
             provider=os.environ.get("LLM_PROVIDER", "none").lower(),
             llm_api_key=os.environ.get("LLM_API_KEY", ""),
             groq_model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            gemini_model=os.environ.get("GEMINI_MODEL", "gemini-flash-latest"),
             tmdb_api_key=os.environ.get("TMDB_API_KEY", ""),
             comskip_enabled=os.environ.get("COMSKIP_ENABLED", "true").lower() != "false",
             settle_minutes=int(os.environ.get("SETTLE_MINUTES", "15")),
