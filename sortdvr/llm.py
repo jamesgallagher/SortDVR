@@ -25,7 +25,8 @@ from sortdvr.models import Recording
 _USER_AGENT = f"SortDVR/{__version__}"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Default model is set in config (openai/gpt-oss-120b). llama-3.3-70b-versatile
+# is decommissioned 2026-08-16. gpt-oss are reasoning models — see _groq.
 GEMINI_MODEL = "gemini-1.5-flash"
 
 SYSTEM = (
@@ -88,12 +89,18 @@ def _post(url: str, headers: dict, payload: dict, timeout: int = 30) -> dict:
 
 def _groq(prompt: str, cfg: Config) -> str:
     body = {
-        "model": GROQ_MODEL,
+        "model": cfg.groq_model,
         "messages": [{"role": "system", "content": SYSTEM},
                      {"role": "user", "content": prompt}],
         "response_format": {"type": "json_object"},
         "temperature": 0,
     }
+    # gpt-oss are reasoning models: in JSON mode they intermittently spend the
+    # whole budget on hidden reasoning and return EMPTY content (Groq then 400s
+    # json_validate_failed). "low" effort fixes it for mechanical tasks and is
+    # faster/cheaper. Scoped so a non-gpt-oss override isn't sent an unknown param.
+    if cfg.groq_model.startswith("openai/gpt-oss"):
+        body["reasoning_effort"] = "low"
     out = _post(GROQ_URL, {"Authorization": f"Bearer {cfg.llm_api_key}"}, body)
     return out["choices"][0]["message"]["content"]
 
